@@ -1,6 +1,6 @@
 <!--
 %\VignetteEngine{knitr::knitr}
-%\VignetteIndexEntry{vignette.rmd}
+%\VignetteIndexEntry{vignette}
 -->
 # Package `qdist`
 

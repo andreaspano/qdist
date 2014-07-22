@@ -1,7 +1,9 @@
 <!--
 %\VignetteEngine{knitr::knitr}
-%\VignetteIndexEntry{vignette.rmd}
+%\VignetteIndexEntry{vignette}
 -->
+# Package `qdist`
+
 ##  Truncated probability function in `R`
  
 `R` provides probability, density, quantile and random number generator functions using a stable naming convention both for the names of the functions and in the first argument of these functions:
