@@ -217,7 +217,7 @@ tqpois(1:3/4, lambda = 100, L  = 90, U = 100)
 
 ## The `gamma` case
 
-The gamma case may result a bit faulty because of the check on input parameters implemented within the body of the `gamma` set of functions.  As a consequence, suppose we define a truncated quantile the gamma distribution as:
+The gamma case may result a bit faulty because of the check on input parameters implemented within the body of the `gamma` set of functions.  As a consequence, suppose we define a truncated quantile function for the gamma distribution as:
 
 ```{r}
 tqgamma <- qtruncate("gamma")
@@ -229,9 +229,9 @@ When we use `tqgamma()` with parameter `rate` it works but may return a set of `
 tqgamma(.25, shape = 1, rate = .3)
 ```
 
-when we use the same function with parameter `scale`, it returns an error:
+but, if using the same function with parameter `scale`, it would return an error:
 
-```{r}
+```{r, eval = FALSE}
 try(tqgamma(ppoints(10), shape = 1, scale = 3))
 ```
 
