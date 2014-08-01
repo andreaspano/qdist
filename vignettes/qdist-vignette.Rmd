@@ -1,0 +1,457 @@
+<!--
+%\VignetteEngine{knitr::knitr}
+%\VignetteIndexEntry{vignette}
+-->
+# Package qdist:  A functional programming approach to truncated probability distributions functions
+
+## Introduction
+Truncated probability distribution are widely used in many applied areas of statistics. Losses severity distributions in the financial  or insurance industries are good cases in point. 
+This paper aims to demonstrate an approach for developing truncated probability, density, quantile and random number generator functions, by using the functional nature of the $R$ language, so that the resulting programming technique for truncated functions can be as similar as possible to the existing non truncated approach.
+
+##  Truncated probability distribution
+
+Suppose we have (COUNTINUOUS?) random variable $Y$ with:
+
+* probability function $G_Y(y)$
+* density function $g_Y(y)$
+
+Let $X$ be a random variable obtained by truncating the distribution of $Y$ over the interval $[L,U]$ where: $-\infty< L < U < \infty$. We can show that:
+
+
+(1) the probability function $F(x)$ of $X$ may be calculated as: 
+
+$$F(x) = \frac{G(\max(\min(x, U),L)) -G(L)}{G(U)-G(L)}$$
+
+
+(2) the density function $f(x)$ of $X$ is:
+
+$$
+f(x) =
+\begin{cases}
+\frac {g(x)}{G(U) - G(L)}, \text{if } L \leq x \leq U \\
+\\
+0 \text{  otherwise }\\
+\end{cases}
+$$
+
+(3) the quantile (inverse of probability) function $F^{-1}(p)$ of $X$ is:
+
+
+$$F^{-1}(p) = G^{-1} (G(U) + p (G(U)-G(L)))$$
+
+where $p$ is a value between $0$ and $1$.
+
+
+(4) and then, to generate pseudo-random numbers from the distribution of $X$ one may use:
+
+$$x = F^{-1}(u)$$
+
+where $u$ is a realization from a Uniform$(0,1)$ random distribution, and $x$ is a realization of $X$.
+
+
+##  Truncated probability function in `R`
+ 
+`R` provides probability, density, quantile and random number generator functions using a stable naming convention both for the names of the functions and in the first argument of these functions:
+
+* probability distribution functions `p<dist>(q)` with `q` vector of quantiles
+* density functions `d<dist>(x)` with `x` vector of quantiles 
+* quantile functions `q<dist>(p)` with `p` vector of probabilities. 
+* random number generation `r<dist>(n)` with `n` number of observations
+
+where `<dist>` indicates the distribution family.
+
+As a result we have: `pnorm(q)`, `dnorm(x)`, `qnorm(p)` and `rnorm(n)` for normal distribution and similarly for all other distributions
+
+Therefore, we use to write:
+
+```{r}
+pnorm(q = 8:12, mean = 10, sd = 1)
+````
+
+to get probability values at `8:12` from a normal distribution with parameters `mean=10` and `sd=1`.
+
+In case we need values from a truncated distribution, as far as we know, we need to load an extra package such as `truncdist`. 
+
+```{r, echo = TRUE, message = FALSE}
+require("truncdist")
+```
+
+The package itself works perfectly. In fact, assuming that  function `pnorm()` exists, we can get probability values from a normal distribution left truncated at `a` and right truncated at `b`, with parameters `mean = 10` and `sd = 1` by simply writing:
+
+```{r}
+ptrunc(q = 8:12 , spec = "norm", mean = 10 , sd = 1, a = 9, b = 11)
+```
+
+where `a = 9` and `b = 11` respectively represent the left and the right thresholds for truncation. 
+
+Nevertheless, the above command requires a change in our programming style. We are used to have a single `R` function for each distribution: `pnorm()`, `pweibull()` etc ...
+
+We could easily write function `tpnorm()`, a truncated version for `pnorm()`, as:
+
+```{r, tidy=FALSE}
+tpnorm <- 
+  function (q, mean = 0, sd = 1, L = -Inf , U = Inf, ...){
+    q <- pmax(pmin(q,U),L)  
+    pq <- stats::pnorm(q = q, mean = mean, sd = sd, ...)
+    pL <- stats::pnorm(q = L, mean = mean, sd = sd, ...)
+    pU <- stats::pnorm(q = U, mean = mean, sd = sd, ...)
+    p <- (pq-pL)/(pU-pL)
+    p
+}
+```
+
+This function clearly works:
+
+```{r}
+tpnorm( q = 8:12, mean = 10, sd = 1, L = 9, U = 11)
+```
+
+
+but it is limited to the normal distribution. Following this approach, we would need to write a different function for each probability distribution and, we'll have to admit that all of this could become quite time consuming and not really efficient.
+
+
+As an alternative approach, we decided to develop package `qdist`: a package made of four functions: 
+
+* `ptruncate()`: truncated probability distribution, 
+* `dtruncate()`: truncated density function
+* `qtruncate()`: truncated quantile functions
+* `rtruncate()`: truncated random numbers generator functions. 
+
+These functions share the same logic: they take as input a probability distribution as a character string and return the equivalent truncated distribution as a function object so that we can write:
+
+
+```{r}
+require(qdist)
+tpnorm <- ptruncate("norm")
+tdnorm <- dtruncate("norm")
+tqnorm <- qtruncate("norm")
+trnorm <- rtruncate("norm")
+```
+
+
+As a first detailed example, let's consider `ptruncate()` in more details applied to the normal case.
+
+The newly generated function `tpnorm()` has the same formals as the original `pnorm()`, plus two extra parameters: `L` and `U`, respectively for lower and upper truncation thresholds set by default to `-Inf` and +`Inf`:.
+
+```{r}
+args(pnorm)
+args(tpnorm)
+```
+
+Once we have defined `tpnorm()` we can use it for generating probability values from a non-truncated normal distribution by leaving parameters `L` and `U` set to their defaults:  
+
+
+```{r}
+q <- seq(6, 14, len = 100) 
+p_L_U <- tpnorm(q, mean = 10, sd = 1)
+
+```
+
+
+or from any truncated normal distribution by setting values for `L` and `U`:
+
+
+```{r}
+p_L9_U11 <- tpnorm(q, mean = 10, sd = 1, L = 9, U = 11)
+```
+
+We can visualize these results by plotting them as in \ref{fig:tnorm} 
+
+```{r tnorm, tidy= FALSE, echo = FALSE , fig.height=4.5, fig.width=7, fig.pos="placehere", fig.lp = "fig:", fig.cap = ''}
+plot(q, p_L_U, type = "n", xlab = "Quantile", ylab = "Probability")
+lines(q, p_L_U, type = "l", col = "darkgray", lwd = 3)
+lines(q, p_L9_U11, type = "l", col = "darkred", lwd = 3)
+legend("topleft", legend = c("p_L_U", "p_L9_U11"), col = c("darkgray", "darkred"), lwd = 3, cex =1.25 , bty = "n" )
+grid()
+```
+
+
+As a second example, we consider a density function for a left truncated Weibull distribution. We first generate function `tdweibull()` by using `dtruncate()`:
+
+```{r}
+tdweibull <- dtruncate("weibull")
+```
+
+and afterward, we can use it as:
+
+```{r}
+x <- qweibull(ppoints(1000), shape = 2, scale = 7)
+d_L0 <- tdweibull(x, shape = 2, scale = 7)
+d_L3 <- tdweibull(x, shape = 2, scale = 7, L = 3)
+d_L5 <- tdweibull(x, shape = 2, scale = 7, L = 5)
+d_L7 <- tdweibull(x, shape = 2, scale = 7, L = 7)
+```
+
+with the following results:
+
+```{r, tidy= FALSE, echo = FALSE}
+plot(x, d_L7, type = "n", xlab = "Quantile", ylab = "Density")
+lines(x, d_L0, type = "l", col = "darkgray", lwd = 3)
+lines(x, d_L3, type = "l", col = "darkred", lwd = 3)
+lines(x, d_L5, type = "l", col = "darkblue", lwd = 3)
+lines(x, d_L7, type = "l", col = "darkgreen", lwd = 3)
+legend("topright", legend = c("d_L0", "d_L3", "d_L5", "d_L7"), col = c("darkgray", "darkred", "darkblue", "darkgreen"), lwd = 3, cex =1.25 , bty = "n" )
+grid()
+```
+
+As an example of random number generator function we consider the Gumbel distribution from package `evd`:
+
+
+```{r}
+require(evd)
+trgumbel <- rtruncate("gumbel")
+args(trgumbel)
+rg <- trgumbel(10^4, loc = 3, scale = 2, L = 5)
+```
+```{r, tidy= FALSE, echo = FALSE}
+hist(rg, xlim = c(0,25), col = "gray", main = "Random data from truncated Gumbel distribution")
+grid()
+```
+
+This approach works for both continuous and discrete probability functions. Let's consider the case of main quantiles generated from a Poisson distribution:
+
+```{r}
+tqpois <- qtruncate("pois")
+tqpois(1:3/4, lambda = 100, L  = 90, U = 100)
+```
+
+## The `gamma` case
+
+The gamma case may result a bit faulty because of the check on input parameters implemented within the body of the `gamma` set of functions.  As a consequence, suppose we define a truncated quantile the gamma distribution as:
+
+```{r}
+tqgamma <- qtruncate("gamma")
+```
+
+When we use `tqgamma()` with parameter `rate` it works but may return a set of `warnings`
+
+```{r}
+tqgamma(.25, shape = 1, rate = .3)
+```
+
+when we use the same function with parameter `scale`, it returns an error:
+
+```{r}
+try(tqgamma(ppoints(10), shape = 1, scale = 3))
+```
+
+Note that, if we simply redefine `qgamma()` and `pgamma()` as:
+
+```{r}
+qgamma <- function (p, shape, rate = 1, lower.tail = TRUE, log.p = FALSE) {
+  scale <-  1/rate
+  .External(stats:::C_qgamma, p, shape, scale, lower.tail, log.p)
+}
+
+pgamma <- function (q, shape, rate = 1, lower.tail = TRUE, log.p = FALSE) {
+  scale <-  1/rate
+  .External(stats:::C_pgamma, q, shape, scale, lower.tail, log.p)
+}
+```
+
+now everything should work fine:
+
+```{r}
+tqgamma <- qtruncate("gamma")
+tqgamma(p = .25, shape = 1, rate = 3)
+```
+
+## Extending the computation
+Once a truncated distribution is defined, we can use it as a building block for further implementations. 
+
+Suppose we want to define a function for maximum likelihood estimate for the truncated normal distribution, we can achieve this by first defining the truncated density function for the normal distribution:
+
+```{r}
+tdnorm <- dtruncate("norm")
+```
+
+and, subsequently, by using `tdnorm()` within an estimator function:
+
+```{r} 
+ltnorm = function(x, L = -Inf, U = Inf) {
+  theta <- c(mean(x), sd(x))
+  ml <- function(theta , x, L = -Inf, U = Inf) {
+        mean <- theta[1]
+        sd <- theta[2]
+        ml <-  tdnorm(x = x, mean = mean, sd = sd, L = L , U = U )
+        -sum(log(ml))
+      }
+  optim(par = theta , fn = ml, x = x, L = L , U = U)$par
+}
+```
+
+As a result:
+
+
+```{r}
+trnorm <- rtruncate("norm")
+x <- trnorm(n = 1000, mean = 5, sd = 2, L = 3, U = 6)
+ltnorm( x = x, L = 3, U = 6)
+```
+
+
+## Computational details
+
+Package `qdist` can be thought as a function factory for truncated distribution functions. Function `ptruncate()`, for example,  takes as input the distribution name: say _norm_ and proceeds as follows:
+
+* gets the corresponding function `pnorm()` 
+* uses `pnorm()` to create a function, say `probability()` that computes truncated probability for normal distributions
+* modify the formals of `probability()` so that it has the same formals as `pnorm()` plus `L` and `U` corresponding to the lower and upper threshold for truncation
+* Returns `probability()`
+
+Package `qdist` is based on two key concepts being part of the functional nature of the `R` programming language:
+
+* The environment of a function can be used as a placeholder for other objects
+* Function formals can be manipulated
+
+### Environment of a function
+
+The _R Language Definition_ manual defines environments as: _''consisting of two things. A frame, consisting of a set of symbol-value pairs, and an enclosure, a pointer to an enclosing environment''_
+
+This idea of a pointer to an enclosing environment is at the core of the `R` mechanism when looking for objects:
+
+_''When R looks up the value for a symbol the frame is examined and if a matching symbol is found its value will be returned. If not, the enclosing environment is then accessed and the process repeated''_.
+
+Environments in `R` play a crucial role as they just work in the background of any `R` functionality. 
+
+Any `R` session has a an associated environment as returned by:
+
+```{r}
+environment()
+```
+
+and, very important for our purposes, any function has an associated environment as stated by the _R Language Definition_ manual: functions  _''have three basic components: a formal argument list, a body and an environment''_.
+
+Specifically, the _environment of a function_ is the environment that was active at the time that the function was created. Generally, for user defined function, the Global environment:
+
+```{r}
+f <- function() 0
+environment(f)
+```
+
+or, when a function is defined within a package, the environment associated to that package:
+
+```{r}
+environment(mean)
+```
+
+Along with the environment where the function was created, functions interact with several other environments. The _evaluation environment_ of a function is one of them.
+
+The _evaluation environment_ of a function is created any time a function is called and is used to host the computation of the function.
+
+The evaluation environment is destroyed when the function exits.
+
+As any environment, the evaluation environment of a function has a parent: the environment of the function.
+
+When we define a function, the function itself knows about its environment and, as a consequence, the function has access to all symbols belonging to that environment.
+
+As an example we may consider a function defined in a dedicated environment along with some other objects defined in the same environment.
+
+
+```{r}
+env <- new.env()
+
+with(env,{ 
+     y <- 99
+     g <- function(x){x+y}
+     })
+
+
+env$g(1)
+```
+
+As we can see, clearly `g()` knows that `x=1` as it was passed to the function as an argument but, `g()` also remembers that `y=99` as `y` belongs the the environment `env`: the environment of `g()`.
+
+Playing with the environment of a function and the execution environment of a function, we can create a function `g()` that returns a function `f()`:
+
+```{r}
+g <- function() {
+  f <- function() 0
+  f
+}
+```
+
+create `f()` as a result of a call to `g()`
+
+```{r}
+f <- g()
+```
+
+and normally run `f()` as:
+
+```{r}
+f()
+```
+
+in this case, the _evaluation environment_ of `g()` corresponds to the _environment_ of `f()` as `f()` is created within the _evaluation environment_ of `g()`. 
+
+As a result, when `g()` exits, its _evaluation environment_ is not destroyed as it became the _environment_ of `f()`. 
+
+Following this line, we can define `g(y)` so that the _evaluation environment_ of `g(y)` is used to pass any argument `y` to `f(x)`:
+
+```{r}
+g <- function(y) {
+  f <- function(x) {x+y}
+}
+```
+
+We can now define and run `f(x)` as:
+
+```{r}
+f <- g(1)
+f(x = 2)
+```
+
+This mechanism allows us to define a _functions factory_: a function `g(y)` that, by varying the values assigned to `y`, allow many `fi(x)` to be defined with very little effort:
+
+```{r}
+f1 <- g(1)
+f2 <- g(2)
+f3 <- g(3)
+```
+
+and use them straighfortly:
+
+```{r}
+f1(x = 100)
+f2(x = 100)
+f3(x = 100)
+```
+
+### Formals argument list
+
+The argument list of a function, as stated in _R Language Definition_ manual is: _''a comma-separated list of arguments. An argument can be a symbol, or a ‘symbol = default’ construct''_.
+
+Function `formals()` returns the formal arguments of a function as an object of class `pairlist`. 
+
+```{r}
+formals_sd <- formals(sd)
+formals_sd
+class(formals_sd)
+```
+
+As a replacement method exists for function `formals`:
+
+```{r functions-011}
+exists("formals<-")
+```
+
+formals of a function can manipulated by using function `alist()`: a `list()` type function that handles unevaluated arguments
+
+```{r}
+f <- function(x, y=0) x+y
+f(1)
+formals(f) <- alist(x=, y=1)
+f(1)
+```
+
+As an example of practical use of `formals()` we may decide to re-define function `mean()` that defaults `na.rm` to `TRUE` by simply:
+
+```{r functions-013}
+formals(mean.default)$na.rm <- TRUE
+mean(c(1,2,NA))
+```
+
+
+
+
