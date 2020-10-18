@@ -10,3 +10,4 @@ Description: Generate truncated density, probability, quantile and random
 License: GPL
 Suggests: knitr
 VignetteBuilder: knitr
+RoxygenNote: 7.1.1
